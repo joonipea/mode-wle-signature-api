@@ -1,12 +1,21 @@
 import * as app from "http";
-import { signUrl } from "./sign.js";
 import dotenv from "dotenv";
+import { use } from "./use.js";
+import { login } from "./methods/login.js";
 dotenv.config();
 
 const PORT = process.env.PORT || 7002;
+const WHITELIST = process.env.WHITELIST;
+
+const routes = {
+    "/login": async (req, res) => {
+        use(req, res, login);
+    },
+};
 const server = app.createServer(async (req, res) => {
     try {
-        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Origin", WHITELIST);
+        // preflight request
         if (req.method === "OPTIONS") {
             res.setHeader("Access-Control-Allow-Methods", "POST");
             res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -14,17 +23,11 @@ const server = app.createServer(async (req, res) => {
             res.end();
             return;
         }
-        let body;
-        req.on("data", async (data) => {
-            body = JSON.parse(data);
-        });
-        req.on("end", async () => {
-            let { url, access_key, timestamp } = body;
-            let secret = process.env.SECRET_KEY;
-            let signedUrl = await signUrl(url, access_key, secret, timestamp);
-            res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ signedUrl }));
-        });
+        // handle routes
+        if (routes[req.url]) {
+            routes[req.url](req, res);
+            return;
+        }
     } catch (error) {
         console.log(error);
     }
